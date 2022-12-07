@@ -28,9 +28,13 @@ while (true)
 }
 
 (int elf, int totalCalories) = elvesWithFood.GetElfWithMostCalories();
+int totalForTop3Elves = elvesWithFood.GetTotalCaloriesForTopElves(3);
 Console.WriteLine($"Elf #{elf} has bag with containing {totalCalories} total calories");
+Console.WriteLine($"Top 3 elves have a total of {totalForTop3Elves} in their bags");
+
 
 internal record FoodItem(int Calories);
+
 internal record ElfBag(int ElfId, List<FoodItem> FoodItems)
 {
     public int TotalCaloriesInBag => FoodItems.Sum(i => i.Calories);
@@ -47,7 +51,20 @@ internal class ElvesWithFood
 
     public (int Elf, int TotalCalories) GetElfWithMostCalories()
     {
-        ElfBag bagWithFood = _bagsByCalories.Dequeue();
+        ElfBag bagWithFood = _bagsByCalories.Peek();
         return (bagWithFood.ElfId, bagWithFood.TotalCaloriesInBag);
+    }
+
+    public int GetTotalCaloriesForTopElves(int count = 1)
+    {
+        List<ElfBag> bags = new(count);
+
+        do
+        {
+            bags.Add(_bagsByCalories.Dequeue());
+            count--;
+        } while (count > 0);
+
+        return bags.Select(i => i.TotalCaloriesInBag).Sum();
     }
 }

@@ -1,0 +1,11 @@
+{
+  "packages": [
+    "dotnet-sdk_7"
+  ],
+  "shell": {
+    "init_hook": null
+  },
+  "nixpkgs": {
+    "commit": "6e51c97f1c849efdfd4f3b78a4870e6aa2da4198"
+  }
+}

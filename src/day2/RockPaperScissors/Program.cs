@@ -13,13 +13,12 @@ while (true)
 
     var hands = lineItem.Split(' ');
     string opponentHand = hands[0];
-    string myHand = hands[1];
+    string desiredOutcome = hands[1];
 
     Round round = game.NewRound();
     round.OpponentPlays(opponentHand);
-    round.Play(myHand);
+    int score = round.GetScoreForDesiredOutcome(desiredOutcome);
 
-    int score = round.GetMyScore();
     game.RecordScore(score);
 }
 
@@ -127,44 +126,70 @@ internal static class Extensions
 
 internal record Round
 {
+    private enum Outcome
+    {
+        Lose,
+        Draw,
+        Win
+    }
+
     private static readonly Dictionary<string, Shape> InputShapeMap = new()
     {
         ["A"] = Rock.Shape,
         ["B"] = Paper.Shape,
-        ["C"] = Scissors.Shape,
-        ["X"] = Rock.Shape,
-        ["Y"] = Paper.Shape,
-        ["Z"] = Scissors.Shape,
+        ["C"] = Scissors.Shape
+    };
+
+    private static readonly Dictionary<string, Outcome> InputStrategyMap = new()
+    {
+        ["X"] = Outcome.Lose,
+        ["Y"] = Outcome.Draw,
+        ["Z"] = Outcome.Win
     };
 
     private Shape OpponentHand { get; set; } = Hand.NoneInstance.Shape;
-    private Shape MyHand { get; set; } = Hand.NoneInstance.Shape;
 
     public void OpponentPlays(string hand)
     {
         OpponentHand = InputShapeMap[hand];
     }
 
-    public void Play(string hand)
+    public int GetScoreForDesiredOutcome(string desiredOutcome)
     {
-        MyHand = InputShapeMap[hand];
-    }
+        int myScore = 0;
 
-    public int GetMyScore()
-    {
-        Play play = OpponentHand.Versus(MyHand);
-        var scoreResult = ScoreChart.GetScore(play);
-        int myScore = MyHand.Points;
-        if (scoreResult.Shape == MyHand)
+        Outcome outcome = InputStrategyMap[desiredOutcome];
+        switch (outcome)
         {
-            myScore += 6;
-        }
-        else if (scoreResult == Hand.NoneInstance)
-        {
-            myScore += 3;
+            case Outcome.Lose:
+                myScore = GetScoreByDesiredOutcome(OpponentHand, 0);
+                break;
+
+            case Outcome.Draw: // just copy his points for his selected hand and add 3 for a tie
+                myScore = 3 + OpponentHand.Points;
+                break;
+
+            case Outcome.Win:
+                myScore = GetScoreByDesiredOutcome(None.Shape, 6);
+                break;
         }
 
         return myScore;
+    }
+
+    private int GetScoreByDesiredOutcome(Shape compare, int outcomePoints)
+    {
+        int score = outcomePoints;
+        foreach (Hand myHand in new[] { Hand.RockInstance, Hand.PaperInstance, Hand.ScissorsInstance, })
+        {
+            var play = OpponentHand.Versus(myHand.Shape);
+            var scoreResult = ScoreChart.GetScore(play);
+            if (scoreResult.Shape != (compare is None ? myHand.Shape : compare)) continue;
+            score = outcomePoints + myHand.Shape.Points;
+            break;
+        }
+
+        return score;
     }
 }
 

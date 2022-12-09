@@ -2,7 +2,7 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Day1", "Day1", "{60597B96-C89E-44BA-AFCB-DCA3DB80F20E}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ElfCalories", "src\day1\ElfCalories.csproj", "{65258396-DDB2-4F12-B0A6-B7679BF87B41}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ElfCalories", "src\day1\CalorieCounting\CalorieCounting.csproj", "{65258396-DDB2-4F12-B0A6-B7679BF87B41}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Day2", "Day2", "{D9C61E36-A034-4083-872F-008BD2EE1E40}"
 EndProject

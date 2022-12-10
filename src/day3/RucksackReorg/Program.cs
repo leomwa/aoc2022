@@ -1,37 +1,39 @@
 ﻿const string inputFileName = "rucksacks.txt";
 var fileReader = File.OpenText(inputFileName);
 
-
-int sumOfItemPriorities = 0;
 int elvesPerGroup = 3;
-int groupCounter = 0;
+int membershipCount = 0;
 List<ThreeElvesGroup> groups = new();
-ThreeElvesGroup threeElvesGroup = new();
+List<TwoCompartmentRucksack> rucksacksForGroup = new();
 
 while (true)
 {
-    var lineItem = await fileReader.ReadLineAsync();
-    if (lineItem is null)
+    var contents = await fileReader.ReadLineAsync();
+    if (contents is null)
     {
         break;
     }
 
-    TwoCompartmentRucksack rucksack = new(lineItem);
-    sumOfItemPriorities += rucksack.GetSumOfPrioritiesCommonToCompartments();
-    threeElvesGroup.Add(rucksack);
-    groupCounter++;
+    TwoCompartmentRucksack rucksack = new(contents);
+    rucksacksForGroup.Add(rucksack);
+    membershipCount++;
 
-    if (groupCounter % elvesPerGroup == 0)
+    if (membershipCount % elvesPerGroup == 0)
     {
-        groups.Add(threeElvesGroup);
-        threeElvesGroup = new(); // reset
+        groups.Add(new ThreeElvesGroup(rucksacksForGroup));
+        rucksacksForGroup = new(); // reset for every 3 elves
     }
 }
 
+groups.ForEach(g => g.ComputeRucksackStatistics());
+
+int sumOfItemPriorities = groups.Sum(g => g.GetPrioritySumOfItemsCommonToCompartments());
 Console.WriteLine($"Sum of item priorities is: {sumOfItemPriorities}");
-int badgePrioritySums = groups.Sum(g=>g.GetSumOfBadgeItemPriorities());
+
+int badgePrioritySums = groups.Sum(g => g.GetSumOfBadgeItemPriorities());
 Console.WriteLine($"Sum of three-Elf group item priorities is: {badgePrioritySums}");
-    
+
+internal readonly record struct RucksackItem(char ItemType, int Priority);
 
 internal static class ItemPriorityMapper
 {
@@ -63,15 +65,15 @@ internal static class ItemPriorityMapper
 
 internal class TwoCompartmentRucksack : IVisitableRucksack
 {
-    class Compartment
+    private class Compartment
     {
-        protected internal readonly List<(char, int)> Items = new(0);
+        protected internal readonly List<RucksackItem> Items = new(0);
 
         public Compartment(string contents)
         {
             foreach (var item in contents)
             {
-                Items.Add((item, ItemPriorityMapper.GetPriority(item)));
+                Items.Add(new(item, ItemPriorityMapper.GetPriority(item)));
             }
         }
     }
@@ -80,63 +82,82 @@ internal class TwoCompartmentRucksack : IVisitableRucksack
 
     public TwoCompartmentRucksack(string contents)
     {
-        Compartments = new(2);
+        int numberOfCompartments = 2;
+        Compartments = new(numberOfCompartments);
 
-        int itemsPerCompartment = contents.Length / 2;
-        InsertIntoCompartments(contents, 2, itemsPerCompartment);
+        InsertIntoCompartments(contents, numberOfCompartments);
     }
 
-    private void InsertIntoCompartments(string contents, int numberOfCompartments, int itemsPerCompartment)
+    private void InsertIntoCompartments(string contents, int numberOfCompartments)
     {
+        int itemsPerCompartment = contents.Length / numberOfCompartments;
         for (int i = 0; i < numberOfCompartments; i++)
         {
             Compartments.Add(new Compartment(contents.Substring(i * itemsPerCompartment, itemsPerCompartment)));
         }
     }
 
-    public int GetSumOfPrioritiesCommonToCompartments()
+    private int GetPrioritySumOfItemsCommonToCompartments()
     {
-        return Compartments[0].Items.Intersect(Compartments[1].Items).Select(i => i.Item2).Sum();
+        return Compartments[0].Items.Intersect(Compartments[1].Items).Sum(i => i.Priority);
     }
 
     public void Accept(IRucksackVisitor visitor)
     {
-        visitor.VisitRucksack(Compartments.SelectMany(c => c.Items));
+        visitor.VisitRucksackItems(Compartments.SelectMany(c => c.Items));
+        visitor.VisitPrioritySumOfItemsCommonToCompartments(GetPrioritySumOfItemsCommonToCompartments());
     }
 }
 
 internal class ThreeElvesGroup : IRucksackVisitor
 {
-    private readonly List<TwoCompartmentRucksack> _rucksacks = new(3);
-    private readonly List<IEnumerable<(char, int)>> _itemsInGroup = new();
+    private readonly List<TwoCompartmentRucksack> _rucksacks;
+    private readonly List<IEnumerable<RucksackItem>> _itemsInGroup = new();
+    private int _prioritySumOfCommonItemsInCompartments;
 
-    public void Add(TwoCompartmentRucksack rucksack)
+    public ThreeElvesGroup(IReadOnlyCollection<TwoCompartmentRucksack> rucksacks)
     {
-        _rucksacks.Add(rucksack);
+        if (rucksacks.Count != 3)
+        {
+            throw new ArgumentException("We need 3 rucksacks for this group of elves");
+        }
+
+        _rucksacks = rucksacks.ToList();
     }
 
-    public void VisitRucksack(IEnumerable<(char, int)> items)
+    public void VisitRucksackItems(IEnumerable<RucksackItem> items)
     {
         _itemsInGroup.Add(items);
     }
 
+    public void VisitPrioritySumOfItemsCommonToCompartments(int sum)
+    {
+        _prioritySumOfCommonItemsInCompartments += sum;
+    }
+
     public int GetSumOfBadgeItemPriorities()
+    {
+        return _itemsInGroup[0].Intersect(_itemsInGroup[1]).Intersect(_itemsInGroup[2]).Sum(i => i.Priority);
+    }
+
+    public void ComputeRucksackStatistics()
     {
         foreach (var rucksack in _rucksacks)
         {
-            rucksack.Accept(this); // collect all items in this group by visiting each rucksack
+            rucksack.Accept(this); // visit each rucksack to get stats
         }
-
-        return _itemsInGroup[0].Intersect(_itemsInGroup[1]).Intersect(_itemsInGroup[2]).Sum(i => i.Item2);
     }
+
+    public int GetPrioritySumOfItemsCommonToCompartments() => _prioritySumOfCommonItemsInCompartments;
 }
 
-interface IRucksackVisitor
+internal interface IRucksackVisitor
 {
-    void VisitRucksack(IEnumerable<(char, int)> contents);
+    void VisitRucksackItems(IEnumerable<RucksackItem> contents);
+    void VisitPrioritySumOfItemsCommonToCompartments(int sum);
 }
 
-interface IVisitableRucksack
+internal interface IVisitableRucksack
 {
     void Accept(IRucksackVisitor visitor);
 }

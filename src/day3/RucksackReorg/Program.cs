@@ -2,7 +2,12 @@
 var fileReader = File.OpenText(inputFileName);
 
 
-int sumOfItemPriorities=0;
+int sumOfItemPriorities = 0;
+int elvesPerGroup = 3;
+int groupCounter = 0;
+List<ThreeElvesGroup> groups = new();
+ThreeElvesGroup threeElvesGroup = new();
+
 while (true)
 {
     var lineItem = await fileReader.ReadLineAsync();
@@ -10,12 +15,23 @@ while (true)
     {
         break;
     }
-    
+
     TwoCompartmentRucksack rucksack = new(lineItem);
     sumOfItemPriorities += rucksack.GetSumOfPrioritiesCommonToCompartments();
+    threeElvesGroup.Add(rucksack);
+    groupCounter++;
+
+    if (groupCounter % elvesPerGroup == 0)
+    {
+        groups.Add(threeElvesGroup);
+        threeElvesGroup = new(); // reset
+    }
 }
 
 Console.WriteLine($"Sum of item priorities is: {sumOfItemPriorities}");
+int badgePrioritySums = groups.Sum(g=>g.GetSumOfBadgeItemPriorities());
+Console.WriteLine($"Sum of three-Elf group item priorities is: {badgePrioritySums}");
+    
 
 internal static class ItemPriorityMapper
 {
@@ -45,7 +61,7 @@ internal static class ItemPriorityMapper
     }
 }
 
-public class TwoCompartmentRucksack
+internal class TwoCompartmentRucksack : IVisitableRucksack
 {
     class Compartment
     {
@@ -82,4 +98,45 @@ public class TwoCompartmentRucksack
     {
         return Compartments[0].Items.Intersect(Compartments[1].Items).Select(i => i.Item2).Sum();
     }
+
+    public void Accept(IRucksackVisitor visitor)
+    {
+        visitor.VisitRucksack(Compartments.SelectMany(c => c.Items));
+    }
+}
+
+internal class ThreeElvesGroup : IRucksackVisitor
+{
+    private readonly List<TwoCompartmentRucksack> _rucksacks = new(3);
+    private readonly List<IEnumerable<(char, int)>> _itemsInGroup = new();
+
+    public void Add(TwoCompartmentRucksack rucksack)
+    {
+        _rucksacks.Add(rucksack);
+    }
+
+    public void VisitRucksack(IEnumerable<(char, int)> items)
+    {
+        _itemsInGroup.Add(items);
+    }
+
+    public int GetSumOfBadgeItemPriorities()
+    {
+        foreach (var rucksack in _rucksacks)
+        {
+            rucksack.Accept(this); // collect all items in this group by visiting each rucksack
+        }
+
+        return _itemsInGroup[0].Intersect(_itemsInGroup[1]).Intersect(_itemsInGroup[2]).Sum(i => i.Item2);
+    }
+}
+
+interface IRucksackVisitor
+{
+    void VisitRucksack(IEnumerable<(char, int)> contents);
+}
+
+interface IVisitableRucksack
+{
+    void Accept(IRucksackVisitor visitor);
 }

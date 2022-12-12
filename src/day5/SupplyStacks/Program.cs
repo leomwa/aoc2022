@@ -20,7 +20,6 @@ while (true)
 
     if (contents.StartsWith("move"))
     {
-        // move 7 from 3 to 9
         var instructionsMatchCollection = Regex.Matches(contents, instructionsPattern, options);
 
         foreach (Match m in instructionsMatchCollection)
@@ -31,6 +30,8 @@ while (true)
 
             rearrangementInstructions.Add(new(move, from, to));
         }
+        
+        continue;
     }
 
     var startingStacksCollection = Regex.Matches(contents, startingStacksPattern, options);
@@ -55,40 +56,51 @@ while (true)
     }
 }
 
-Dictionary<int, Stack<string>> startingCrateStacks = stacksAndCratesInput
-    .OrderBy(pair => pair.Key)
-    .ToDictionary(pair => pair.Key, pair =>
-    {
-        pair.Value.Reverse();
-        return new Stack<string>(pair.Value);
-    });
+Dictionary<int, Stack<string>> DefaultCrateStacksFactory() =>
+    stacksAndCratesInput
+        .OrderBy(pair => pair.Key)
+        .ToDictionary(pair => pair.Key, pair =>
+        {
+            var strings = pair.Value.ToArray();
+            return new Stack<string>(strings.Reverse());
+        });
 
-RigOperator rigOperator = new(startingCrateStacks, rearrangementInstructions);
-rigOperator.PerformRearrangementProcedure();
-string topCrates = rigOperator.GetTopCratesFromAllStacks();
+ICargoCrane rigOperatorOnCrateMover9000 = new CrateMover9000(DefaultCrateStacksFactory, rearrangementInstructions);
+rigOperatorOnCrateMover9000.PerformRearrangementProcedure();
+string topCratesCrateMover9000 = rigOperatorOnCrateMover9000.GetTopCratesFromAllStacks();
 
-Console.WriteLine($"Top crates from all stacks are: {topCrates}");
+Console.WriteLine($"CrateMover9000: Top crates from all stacks are: {topCratesCrateMover9000}");
 
+ICargoCrane rigOperatorOnCrateMover9001 = new CrateMover9001(DefaultCrateStacksFactory, rearrangementInstructions);
+rigOperatorOnCrateMover9001.PerformRearrangementProcedure();
+string topCratesCrateMover9001 = rigOperatorOnCrateMover9001.GetTopCratesFromAllStacks();
+Console.WriteLine($"CrateMover9001: Top crates from all stacks are: {topCratesCrateMover9001}");
 
 public record struct Rearrangement(int CratesToMove, int FromStack, int ToStack);
 
-internal class RigOperator
+internal interface ICargoCrane
 {
-    private readonly Dictionary<int, Stack<string>> _startingCrateStacks;
+    void PerformRearrangementProcedure();
+    string GetTopCratesFromAllStacks();
+}
+
+internal class CrateMover9000 : ICargoCrane
+{
+    private readonly Dictionary<int, Stack<string>> _initialCrateStacks;
     private readonly List<Rearrangement> _rearrangements;
 
-    public RigOperator(Dictionary<int, Stack<string>> startingCrateStacks, List<Rearrangement> rearrangements)
+    public CrateMover9000(Func<Dictionary<int, Stack<string>>> stacksFactory, IEnumerable<Rearrangement> rearrangements)
     {
-        _startingCrateStacks = startingCrateStacks;
-        _rearrangements = rearrangements;
+        _initialCrateStacks = stacksFactory();
+        _rearrangements = new(rearrangements);
     }
 
     public void PerformRearrangementProcedure()
     {
         foreach (Rearrangement instruction in _rearrangements)
         {
-            var source = _startingCrateStacks[instruction.FromStack];
-            var destination = _startingCrateStacks[instruction.ToStack];
+            var source = _initialCrateStacks[instruction.FromStack];
+            var destination = _initialCrateStacks[instruction.ToStack];
             int moves = instruction.CratesToMove;
 
             while (moves > 0)
@@ -102,7 +114,49 @@ internal class RigOperator
 
     public string GetTopCratesFromAllStacks()
     {
-        var topCrates = _startingCrateStacks.Select(s => s.Value.Peek().Trim('[', ']'));
+        var topCrates = _initialCrateStacks.Select(s => s.Value.Peek().Trim('[', ']'));
+        return string.Join(string.Empty, topCrates);
+    }
+}
+
+internal class CrateMover9001 : ICargoCrane
+{
+    private readonly Dictionary<int, Stack<string>> _initialCrateStacks;
+    private readonly List<Rearrangement> _rearrangements;
+
+    public CrateMover9001(Func<Dictionary<int, Stack<string>>> stacksFactory, IEnumerable<Rearrangement> rearrangements)
+    {
+        _initialCrateStacks = stacksFactory();
+        _rearrangements = new(rearrangements);
+    }
+
+    public void PerformRearrangementProcedure()
+    {
+        foreach (Rearrangement instruction in _rearrangements)
+        {
+            var source = _initialCrateStacks[instruction.FromStack];
+            var destination = _initialCrateStacks[instruction.ToStack];
+            int moves = instruction.CratesToMove;
+            Stack<string> cratesOnTheMove = new(moves);
+
+            while (moves > 0)
+            {
+                var crateOnTheMove = source.Pop();
+                cratesOnTheMove.Push(crateOnTheMove);
+                moves--;
+            }
+
+            while (cratesOnTheMove.Count > 0)
+            {
+                var crateOnTheMove = cratesOnTheMove.Pop();
+                destination.Push(crateOnTheMove);
+            }
+        }
+    }
+
+    public string GetTopCratesFromAllStacks()
+    {
+        var topCrates = _initialCrateStacks.Select(s => s.Value.Peek().Trim('[', ']'));
         return string.Join(string.Empty, topCrates);
     }
 }

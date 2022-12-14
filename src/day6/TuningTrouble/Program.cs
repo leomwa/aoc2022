@@ -1,11 +1,4 @@
-﻿/*
- * For each character, add to tracker object
- * count number of character seen so far
- * then compute if last 4 characters are unique
- * if true, break and report
- */
-
-const string inputFileName = "tuning-trouble-input.txt";
+﻿const string inputFileName = "tuning-trouble-input.txt";
 using StreamReader fileReader = File.OpenText(inputFileName);
 string input = await fileReader.ReadToEndAsync();
 
@@ -29,7 +22,6 @@ public class StartOfMarkerDetector
     private bool StartOfPacketMarkerDetected { get; set; }
     private bool StartOfMessageMarkerDetected { get; set; }
 
-
     public StartOfMarkerDetector(int startOfPacketChars, int startOfMessageChars)
     {
         _startOfPacketChars = startOfPacketChars;
@@ -42,65 +34,41 @@ public class StartOfMarkerDetector
         {
             _startOfPacketIndex++;
             _packetChars.Add(c);
-            CheckForStartOfPacketMarker();
+            StartOfPacketMarkerDetected = CheckForStartOfMarker(_packetChars, _startOfPacketChars);
         }
 
         if (!StartOfMessageMarkerDetected)
         {
             _startOfMessageIndex++;
             _messageChars.Add(c);
-            CheckForStartOfMessageMarker();
+            StartOfMessageMarkerDetected = CheckForStartOfMarker(_messageChars, _startOfMessageChars);
         }
     }
 
-    private void CheckForStartOfPacketMarker()
+    private bool CheckForStartOfMarker(List<char> charsToCheck, int charCount)
     {
-        if (_packetChars.Count < _startOfPacketChars)
+        if (charsToCheck.Count < charCount)
         {
-            return;
+            // not enough characters to create marker
+            return false;
         }
 
-        if (_packetChars.Count >= _startOfPacketChars)
+        var marker = new HashSet<char>();
+        if (charsToCheck.Count >= charCount)
         {
-            var set = new HashSet<char>();
-
-            if (_packetChars.ToArray()[^_startOfPacketChars..].Any(c => !set.Add(c)))
+            // slice array of seen chars by required length
+            // ^charCount.. means N chars from the end
+            char[] sliceToCheck = charsToCheck.ToArray()[^charCount..];
+            
+            if (sliceToCheck.Any(c => !marker.Add(c)))
             {
-                return;
-            }
-
-            if (set.Count != _startOfPacketChars)
-            {
-                return;
+                // duplicate character detected, not the marker
+                return false;
             }
         }
-
-        StartOfPacketMarkerDetected = true;
-    }
-
-    private void CheckForStartOfMessageMarker()
-    {
-        if (_messageChars.Count < _startOfMessageChars)
-        {
-            return;
-        }
-
-        if (_messageChars.Count >= _startOfMessageChars)
-        {
-            var set = new HashSet<char>();
-
-            if (_messageChars.ToArray()[^_startOfMessageChars..].Any(c => !set.Add(c)))
-            {
-                return;
-            }
-
-            if (set.Count != _startOfMessageChars)
-            {
-                return;
-            }
-        }
-
-        StartOfMessageMarkerDetected = true;
+        
+        Console.WriteLine($"Marker found {string.Join(string.Empty, marker)}");
+        return true;
     }
 
     public void CreateReport()

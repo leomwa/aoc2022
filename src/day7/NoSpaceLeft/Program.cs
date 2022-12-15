@@ -34,6 +34,7 @@ public class FileSystemSpaceCalculator
     private const string FileInfoPattern = @"(?<fileSize>\d.*) (?<fileName>.*)";
 
     private static readonly Dictionary<string, DirectoryInformation> FileSystem = new();
+    private static readonly DirectoryInformation RootDirectory = new(Root, string.Empty);
     private static DirectoryInformation _cwd;
 
     public void Parse(string input)
@@ -82,20 +83,19 @@ public class FileSystemSpaceCalculator
             switch (directory)
             {
                 case Root:
-                    var root = new DirectoryInformation(Root, string.Empty);
-                    FileSystem.Add(Root, root);
-                    _cwd = root;
-                    return;
+                    FileSystem.Add(Root, RootDirectory);
+                    currentWorkingDirectory = RootDirectory;
+                    break;
 
                 case GoToParent:
                     if (_cwd.ParentName == Root || string.IsNullOrWhiteSpace(_cwd.ParentName))
                     {
-                        _cwd = FileSystem[Root];
-                        return;
+                        currentWorkingDirectory = RootDirectory;
+                        break;
                     }
 
-                    _cwd = FileSystem[_cwd.ParentName];
-                    return;
+                    currentWorkingDirectory = FileSystem[_cwd.ParentName];
+                    break;
 
                 default:
                     string dirIndexName = $"{_cwd.Name}/{directory}";
@@ -104,8 +104,8 @@ public class FileSystemSpaceCalculator
                         dirIndexName = directory;
                     }
 
-                    _cwd = FileSystem[dirIndexName];
-                    return;
+                    currentWorkingDirectory = FileSystem[dirIndexName];
+                    break;
             }
         }
 
@@ -155,7 +155,7 @@ public class FileSystemSpaceCalculator
     public static int GetSmallestDirectoryToFreeSpaceRequired(int spaceRequired)
     {
         // used space subtracted from max space on disk is unused space
-        int unusedSpace = MaxDiskSpace - FileSystem[Root].TotalSize();
+        int unusedSpace = MaxDiskSpace - RootDirectory.TotalSize();
         // check if unused space is enough compared to required
         int spaceToFree = spaceRequired - unusedSpace;
 

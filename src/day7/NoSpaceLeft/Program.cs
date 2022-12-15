@@ -16,11 +16,17 @@ while (true)
     spaceCalculator.Parse(input);
 }
 
-int totalSize100K = spaceCalculator.ToTalSizesOfDirectoriesWithSize(100_000);
-Console.WriteLine($"Sum of total sizes for directories with 100000 sizes is: {totalSize100K}");
+int totalSize100K = FileSystemSpaceCalculator.ToTalSizesOfDirectoriesWithSize(100_000);
+Console.WriteLine($"Part1: Sum of total sizes of directories with at least 100000 in size is: {totalSize100K}");
+
+int availableToDelete = FileSystemSpaceCalculator.GetSmallestDirectoryToFreeSpaceRequired(30_000_000);
+Console.WriteLine($"Part2: Smallest directory size available to delete is: {availableToDelete}");
+
 
 public class FileSystemSpaceCalculator
 {
+    private const int MaxDiskSpace = 70_000_000;
+
     private const string Root = "/";
     private const string GoToParent = "..";
     private const string CommandPattern = @"\$ (cd|ls) ?(?<directory>.*)";
@@ -139,11 +145,26 @@ public class FileSystemSpaceCalculator
         Console.WriteLine($"Added {fileInfo.FileName} to {_cwd.Name}");
     }
 
-    public int ToTalSizesOfDirectoriesWithSize(int maxPerDirectory)
+    public static int ToTalSizesOfDirectoriesWithSize(int maxPerDirectory)
     {
         return
             FileSystem.Values.Where(dir => dir.TotalSize() <= maxPerDirectory)
                 .Sum(dir => dir.TotalSize());
+    }
+
+    public static int GetSmallestDirectoryToFreeSpaceRequired(int spaceRequired)
+    {
+        // used space subtracted from max space on disk is unused space
+        int unusedSpace = MaxDiskSpace - FileSystem[Root].TotalSize();
+        // check if unused space is enough compared to required
+        int spaceToFree = spaceRequired - unusedSpace;
+
+        // find directory where space is >= spaceToFree, pick the smallest
+
+        return FileSystem.Values
+            .Where(dir => dir.TotalSize() >= spaceToFree)
+            .Select(dir => dir.TotalSize())
+            .Min();
     }
 }
 

@@ -33,7 +33,7 @@ public class FileSystemSpaceCalculator
     private const string DirectoryNamePattern = @"(dir (?<dirName>.+))";
     private const string FileInfoPattern = @"(?<fileSize>\d.*) (?<fileName>.*)";
 
-    private static readonly Dictionary<string, DirectoryInformation> FileSystem = new();
+    private static readonly Dictionary<string, DirectoryInformation> FileSystemMap = new();
     private static readonly DirectoryInformation RootDirectory = new(Root, string.Empty);
     private static DirectoryInformation _cwd;
 
@@ -71,45 +71,39 @@ public class FileSystemSpaceCalculator
         {
             int fileSize = Convert.ToInt32(fileInfoMatch.Groups["fileSize"].Value);
             string fileName = fileInfoMatch.Groups["fileName"].Value;
-            AddFileToCurrentDirectory(new FileInformation(fileName, fileSize));
+            AddFileToCurrentDirectory(new(fileName, fileSize));
         }
     }
 
     private static void ChangeDirectory(string directory)
     {
-        string search = _cwd.Name == Root ? directory : $"{_cwd.Name}/{directory}";
-        if (!FileSystem.TryGetValue(search, out var currentWorkingDirectory))
+        string search = new FsIndex(directory, _cwd).NameInIndex;
+        if (!FileSystemMap.TryGetValue(search, out var cwd))
         {
             switch (directory)
             {
                 case Root:
-                    FileSystem.Add(Root, RootDirectory);
-                    currentWorkingDirectory = RootDirectory;
+                    FileSystemMap.Add(Root, RootDirectory);
+                    cwd = RootDirectory;
                     break;
 
                 case GoToParent:
                     if (_cwd.ParentName == Root || string.IsNullOrWhiteSpace(_cwd.ParentName))
                     {
-                        currentWorkingDirectory = RootDirectory;
+                        cwd = RootDirectory;
                         break;
                     }
 
-                    currentWorkingDirectory = FileSystem[_cwd.ParentName];
+                    cwd = FileSystemMap[_cwd.ParentName];
                     break;
 
                 default:
-                    string dirIndexName = $"{_cwd.Name}/{directory}";
-                    if (_cwd.Name == Root)
-                    {
-                        dirIndexName = directory;
-                    }
-
-                    currentWorkingDirectory = FileSystem[dirIndexName];
+                    cwd = FileSystemMap[new FsIndex(directory, _cwd).NameInIndex];
                     break;
             }
         }
 
-        _cwd = currentWorkingDirectory;
+        _cwd = cwd;
     }
 
     private static void ListDirectoryContents()
@@ -120,23 +114,12 @@ public class FileSystemSpaceCalculator
 
     private void AddDirectoryToFileSystem(string directoryName)
     {
-        string nameInFileSystem = $"{_cwd.Name}/{directoryName}";
-        if (_cwd.Name == Root)
-        {
-            nameInFileSystem = directoryName;
-        }
+        FsIndex index = new(directoryName, _cwd);
+        DirectoryInformation fsItem = new DirectoryInformation(index.NameInIndex, index.ParentName);
+        FileSystemMap.TryAdd(index.NameInIndex, fsItem);
+        _cwd.AddChildDirectory(fsItem);
 
-        string parentName = _cwd.Name;
-        if (string.IsNullOrWhiteSpace(_cwd.ParentName))
-        {
-            parentName = Root;
-        }
-
-        var dir = new DirectoryInformation(nameInFileSystem, parentName);
-        FileSystem.TryAdd(nameInFileSystem, dir);
-        _cwd.AddChildDirectory(dir);
-
-        Console.WriteLine($"Added dirname:{nameInFileSystem} with parent:{parentName}");
+        Console.WriteLine($"Added dirname:{index.NameInIndex} with parent:{index.ParentName}");
     }
 
     private void AddFileToCurrentDirectory(FileInformation fileInfo)
@@ -148,7 +131,7 @@ public class FileSystemSpaceCalculator
     public static int ToTalSizesOfDirectoriesWithSize(int maxPerDirectory)
     {
         return
-            FileSystem.Values.Where(dir => dir.TotalSize() <= maxPerDirectory)
+            FileSystemMap.Values.Where(dir => dir.TotalSize() <= maxPerDirectory)
                 .Sum(dir => dir.TotalSize());
     }
 
@@ -161,12 +144,21 @@ public class FileSystemSpaceCalculator
 
         // find directory where space is >= spaceToFree, pick the smallest
 
-        return FileSystem.Values
+        return FileSystemMap.Values
             .Where(dir => dir.TotalSize() >= spaceToFree)
             .Select(dir => dir.TotalSize())
             .Min();
     }
+
+    private readonly record struct FsIndex(string Name, DirectoryInformation Parent)
+    {
+        // index in format: {ParentName}/{Name}, but if under root, then plain name is OK
+        public string NameInIndex => Parent.Name == Root ? Name : $"{Parent.Name}/{Name}";
+
+        public string ParentName => string.IsNullOrWhiteSpace(Parent.ParentName) ? Root : Parent.Name;
+    }
 }
+
 
 public readonly record struct DirectoryInformation(string Name, string ParentName)
 {
